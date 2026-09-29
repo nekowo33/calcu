@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>calculator.uwu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --base: #FFAAAA;
+    --stroke: #964D4D;
+    --pink-btn: #FFDCDC;
+    --blue-btn: #CCFFF6;
+    --blue-text: #3A7B7B;
+    --eq-bg: #FDFFDC;
+    --eq-text: #838224;
+    --grille: #453B3B;
+    --screen: #D9D9D9;
+    --grid-line: #E7AAAA;
+    --online-dot: #5ADA5A;
+    --online-ring: #2A4025;
+    --offline-dot: #b8b8b8;
+    --offline-ring: #5a5a5a;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background-color: #FFDCDC;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 28px 28px;
+    font-family: 'Roboto Mono', monospace;
+    font-weight: 700;
+    color: var(--stroke);
+  }
+
+  /* Wrapper fills the viewport and centers the scaled stage inside it,
+     so the calculator always fits the screen without scrolling. */
+  #stage-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* The design canvas: fixed 1440x1024, matching the Figma frame exactly.
+     JS scales this uniformly (width AND height) to fit inside the viewport
+     with a little breathing room; every child coordinate below is a
+     literal 1:1 copy of the Figma X/Y/width/height values. */
+  #stage {
+    position: relative;
+    width: 1440px;
+    height: 1024px;
+    transform-origin: center center;
+    flex-shrink: 0;
+  }
+
+  .el { position: absolute; }
+
+  .deco img { display: block; width: 100%; height: 100%; }
+  .deco {
+    animation: float 5s ease-in-out infinite;
+    transform-origin: center;
+  }
+  @keyframes float {
+    0%, 100% { translate: 0 0; }
+    50%      { translate: 0 -14px; }
+  }
+  .bow-deco { animation: bowfloat 4s ease-in-out infinite; }
+  @keyframes bowfloat {
+    0%, 100% { translate: 0 0; rotate: 12.98deg; }
+    50%      { translate: 0 -10px; rotate: 17deg; }
+  }
+
+  /* ---------- page-level text/indicators ---------- */
+  .title-text {
+    left: 50%;
+    top: 51px;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 100%;
+    font-size: 35px;
+    white-space: nowrap;
+    text-align: center;
+  }
+  .status-row   { left: 1085px; top: 68px;  display: flex; align-items: center; gap: 8px; font-size: 15px; white-space: nowrap; }
+  .dot {
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--online-dot);
+    border: 2px solid var(--online-ring);
+    flex-shrink: 0;
+  }
+  .dot.online { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(90, 218, 90, .5); }
+    50%      { box-shadow: 0 0 0 4px rgba(90, 218, 90, 0); }
+  }
+  .dot.offline { background: var(--offline-dot); border-color: var(--offline-ring); animation: none; }
+
+  .signature-text { left: 186px; top: 953px; font-size: 25px; white-space: nowrap; }
+  .python-status   { left: 1040px; top: 878px; font-size: 15px; line-height: 1.4; }
+
+  /* ---------- calculator card ---------- */
+  .calculator {
+    left: 452px;
+    top: 133px;
+    width: 536px;
+    height: 782px;
+    background: var(--base);
+    border: 5px solid var(--stroke);
+    border-radius: 34px;
+    box-shadow: 0 14px 0 rgba(150, 77, 77, 0.15);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-evenly;
+    padding: 0 48.5px;
+  }
+
+  .grille { display: flex; gap: 6px; }
+  .grille span { width: 11px; height: 24px; background: var(--grille); border-radius: 3px; }
+
+  .screen {
+    width: 439px;
+    height: 153px;
+    background: var(--screen);
+    border: 4px solid var(--stroke);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 20px;
+    overflow: hidden;
+  }
+  #display {
+    font-size: 96px;
+    line-height: 1;
+    color: var(--stroke);
+    white-space: nowrap;
+  }
+  #display.pop { animation: pop .18s ease; }
+  @keyframes pop {
+    0%   { transform: scale(0.9); opacity: 0.4; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .buttons {
+    width: 439px;
+    display: grid;
+    grid-template-columns: repeat(4, 100px);
+    grid-auto-rows: 66px;
+    gap: 13px;
+    justify-content: center;
+  }
+
+  button {
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 32px;
+    border: 3px solid var(--stroke);
+    border-radius: 12px;
+    padding: 0;
+    cursor: pointer;
+    transition: transform .12s cubic-bezier(.34,1.56,.64,1), box-shadow .12s ease, filter .12s ease;
+    box-shadow: 0 4px 0 rgba(150,77,77,.35);
+  }
+  button:hover { filter: brightness(1.04); }
+  button:active {
+    transform: translateY(3px) scale(.96);
+    box-shadow: 0 1px 0 rgba(150,77,77,.35);
+  }
+
+  .pink { background: var(--pink-btn); color: var(--stroke); }
+  .blue { background: var(--blue-btn); color: var(--blue-text); }
+  button.power { font-size: 28px; }
+  .equals {
+    grid-column: span 2;
+    background: var(--eq-bg);
+    color: var(--eq-text);
+  }
+
+  .deco-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .deco-cell img {
+    width: 44px;
+    height: 44px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stage-wrapper">
+  <div id="stage">
+
+    <div class="el deco" style="left:35px; top:-11px; width:201px; height:201px; rotate: 0deg; animation-delay: 0s;">
+      <img src="images/pink1.png">
+    </div>
+    <div class="el deco" style="left:164px; top:289px; width:106.67px; height:106.67px; rotate: 11.09deg; animation-delay: 0.4s;">
+      <img src="images/takopi1.png">
+    </div>
+    <div class="el deco" style="left:283px; top:443px; width:121.92px; height:121.92px; rotate: -7.74deg; animation-delay: 0.8s;">
+      <img src="images/madoka1.png">
+    </div>
+    <div class="el deco" style="left:150px; top:621px; width:129.04px; height:129.04px; rotate: 12.52deg; animation-delay: 1.2s;">
+      <img src="images/pusheen1.png">
+    </div>
+    <div class="el deco" style="left:496px; top:800px; width:88px; height:88px; rotate: 0deg; z-index:3; animation-delay: 0.6s;">
+      <img src="images/bocchislime1.png">
+    </div>
+    <div class="el deco bow-deco" style="left:375.098px; top:50.93px; width:188.45px; height:188.45px; rotate: 12.98deg; z-index:3; animation-delay: 0s;">
+      <img src="images/pinkbow1.png">
+    </div>
+    <div class="el deco" style="left:956px; top:83px; width:107.92px; height:107.92px; rotate: -4.24deg; animation-delay: 0.3s;">
+      <img src="images/arrowpink1.png">
+    </div>
+    <div class="el deco" style="left:1120px; top:275px; width:137.08px; height:137.08px; rotate: -9.78deg; animation-delay: 0.9s;">
+      <img src="images/wonderhoy1.png">
+    </div>
+    <div class="el deco" style="left:1031.19px; top:474.16px; width:120.7px; height:120.7px; rotate: 17.04deg; animation-delay: 1.5s;">
+      <img src="images/meow1.png">
+    </div>
+    <div class="el deco" style="left:1171px; top:649px; width:114.53px; height:114.53px; rotate: -7.13deg; animation-delay: 0.5s;">
+      <img src="images/bear1.png">
+    </div>
+    <div class="el deco" style="left:1299px; top:880px; width:145px; height:145px; rotate: 0deg; animation-delay: 1.1s;">
+      <img src="images/bocchi1.png">
+    </div>
+    <div class="el deco" style="left:6px; top:869px; width:155px; height:155px; rotate: 0deg; animation-delay: 0.7s;">
+      <img src="images/bocchi2.png">
+    </div>
+
+    <!-- page-level text -->
+    <div class="el title-text">calculator.uwu</div>
+
+    <div class="el status-row">
+      <span>Services Online!</span>
+      <span id="statusDot" class="dot online"></span>
+    </div>
+
+    <div class="el signature-text">made by mari bsit-3e</div>
+
+    <div class="el python-status" id="footerStatus">
+      Python worker connected<br>Ready to use!
+    </div>
+
+    <!-- calculator card -->
+    <div class="el calculator">
+      <div class="grille">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+
+      <div class="screen">
+        <span id="display">0</span>
+      </div>
+
+      <div class="buttons">
+        <button class="pink" data-action="clear">AC</button>
+        <button class="blue" data-action="delete">DEL</button>
+        <button class="pink" data-op="modulo">%</button>
+        <button class="blue" data-op="divide">÷</button>
+
+        <button class="pink" data-digit="7">7</button>
+        <button class="blue" data-digit="8">8</button>
+        <button class="pink" data-digit="9">9</button>
+        <button class="blue" data-op="multiply">x</button>
+
+        <button class="pink" data-digit="4">4</button>
+        <button class="blue" data-digit="5">5</button>
+        <button class="pink" data-digit="6">6</button>
+        <button class="blue" data-op="subtract">-</button>
+
+        <button class="pink" data-digit="1">1</button>
+        <button class="blue" data-digit="2">2</button>
+        <button class="pink" data-digit="3">3</button>
+        <button class="blue" data-op="add">+</button>
+
+        <button class="pink" data-action="sign">±</button>
+        <button class="blue power" data-op="power">x,y</button>
+        <button class="pink" data-action="sqrt">√</button>
+        <button class="blue" data-action="decimal">.</button>
+
+        <button class="pink" data-digit="0" style="grid-column: 2;">0</button>
+        <button class="equals" data-action="equals">=</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---- responsive scaling of the fixed 1440x1024 design canvas ----
+  const DESIGN_W = 1440;
+  const DESIGN_H = 1024;
+  const wrapper = document.getElementById('stage-wrapper');
+  const stage = document.getElementById('stage');
+
+  function applyScale() {
+    // Fit inside the viewport on BOTH axes (not just width), so the
+    // calculator is always fully visible with no page scrolling, and
+    // shrink it a touch further so it doesn't touch the screen edges.
+    const scaleW = window.innerWidth / DESIGN_W;
+    const scaleH = window.innerHeight / DESIGN_H;
+    const scale = Math.min(scaleW, scaleH) * 0.94;
+    stage.style.transform = `scale(${scale})`;
+  }
+  window.addEventListener('resize', applyScale);
+  applyScale();
+
+  // ---- calculator logic ----
+  const display = document.getElementById('display');
+  const statusDot = document.getElementById('statusDot');
+  const footerStatus = document.getElementById('footerStatus');
+
+  let current = '0';
+  let firstOperand = null;
+  let operator = null;
+  let waitingForSecond = false;
+
+  function render() {
+    display.textContent = current;
+    display.classList.remove('pop');
+    void display.offsetWidth;
+    display.classList.add('pop');
+  }
+
+  function resetAll() {
+    current = '0';
+    firstOperand = null;
+    operator = null;
+    waitingForSecond = false;
+    render();
+  }
+
+  function inputDigit(d) {
+    if (waitingForSecond) {
+      current = d;
+      waitingForSecond = false;
+    } else {
+      current = current === '0' ? d : current + d;
+    }
+    render();
+  }
+
+  function inputDecimal() {
+    if (waitingForSecond) {
+      current = '0.';
+      waitingForSecond = false;
+      render();
+      return;
+    }
+    if (!current.includes('.')) {
+      current += '.';
+      render();
+    }
+  }
+
+  function backspace() {
+    if (waitingForSecond) return;
+    current = current.length > 1 ? current.slice(0, -1) : '0';
+    render();
+  }
+
+  function toggleSign() {
+    if (current === '0') return;
+    current = current.startsWith('-') ? current.slice(1) : '-' + current;
+    render();
+  }
+
+  async function callApi(num1, num2, op) {
+    const res = await fetch('/api/calculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ num1, num2, operation: op })
+    });
+    if (!res.ok) throw new Error('Gateway error');
+    const data = await res.json();
+    const result = data.python_result && data.python_result.result;
+    if (typeof result !== 'number') throw new Error(String(result));
+    return result;
+  }
+
+  async function handleSquareRoot() {
+    try {
+      const value = parseFloat(current);
+      const result = await callApi(value, 0, 'square_root');
+      current = String(result);
+    } catch (err) {
+      current = 'Error';
+    }
+    firstOperand = null;
+    operator = null;
+    waitingForSecond = true;
+    render();
+  }
+
+  async function handleOperator(nextOp) {
+    const inputValue = parseFloat(current);
+
+    if (operator && !waitingForSecond) {
+      try {
+        const result = await callApi(firstOperand, inputValue, operator);
+        current = String(result);
+        firstOperand = result;
+      } catch (err) {
+        current = 'Error';
+        firstOperand = null;
+        operator = null;
+        waitingForSecond = true;
+        render();
+        return;
+      }
+    } else {
+      firstOperand = inputValue;
+    }
+
+    operator = nextOp;
+    waitingForSecond = true;
+    render();
+  }
+
+  async function handleEquals() {
+    if (operator === null || waitingForSecond) return;
+    const inputValue = parseFloat(current);
+    try {
+      const result = await callApi(firstOperand, inputValue, operator);
+      current = String(result);
+      firstOperand = result;
+    } catch (err) {
+      current = 'Error';
+      firstOperand = null;
+    }
+    operator = null;
+    waitingForSecond = true;
+    render();
+  }
+
+  document.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const { digit, op, action } = btn.dataset;
+      if (digit !== undefined) return inputDigit(digit);
+      if (action === 'clear') return resetAll();
+      if (action === 'delete') return backspace();
+      if (action === 'sign') return toggleSign();
+      if (action === 'decimal') return inputDecimal();
+      if (action === 'sqrt') return handleSquareRoot();
+      if (action === 'equals') return handleEquals();
+      if (op) return handleOperator(op);
+    });
+  });
+
+  async function checkStatus() {
+    try {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      const pythonUp = data.python && data.python.status;
+      if (pythonUp) {
+        statusDot.classList.remove('offline');
+        statusDot.classList.add('online');
+        footerStatus.innerHTML = 'Python worker connected<br>Ready to use!';
+      } else {
+        throw new Error('python down');
+      }
+    } catch (err) {
+      statusDot.classList.remove('online');
+      statusDot.classList.add('offline');
+      footerStatus.innerHTML = 'Python worker unreachable<br>Start app.py to continue';
+    }
+  }
+
+  checkStatus();
+  setInterval(checkStatus, 5000);
+})();
+</script>
+</body>
+</html>
