@@ -40,20 +40,13 @@
     color: var(--stroke);
   }
 
-  /* Wrapper fills the viewport and centers the scaled stage inside it,
-     so the calculator always fits the screen without scrolling. */
   #stage-wrapper {
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
   }
 
-  /* The design canvas: fixed 1440x1024, matching the Figma frame exactly.
-     JS scales this uniformly (width AND height) to fit inside the viewport
-     with a little breathing room; every child coordinate below is a
-     literal 1:1 copy of the Figma X/Y/width/height values. */
   #stage {
     position: relative;
     width: 1440px;
@@ -134,17 +127,32 @@
     border: 4px solid var(--stroke);
     border-radius: 16px;
     display: flex;
-    align-items: center;
-    justify-content: flex-end;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
     padding: 0 20px;
     overflow: hidden;
   }
+
   #display {
     font-size: 96px;
     line-height: 1;
     color: var(--stroke);
     white-space: nowrap;
   }
+
+    #expression {
+    font-size: 28px;
+    line-height: 1;
+    min-height: 32px;
+    color: var(--stroke);
+    opacity: .7;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   #display.pop { animation: pop .18s ease; }
   @keyframes pop {
     0%   { transform: scale(0.9); opacity: 0.4; }
@@ -264,6 +272,7 @@
       </div>
 
       <div class="screen">
+        <div id="expression"></div>
         <span id="display">0</span>
       </div>
 
@@ -323,16 +332,21 @@
 
   // ---- calculator logic ----
   const display = document.getElementById('display');
+  const expressionEl = document.getElementById('expression');
   const statusDot = document.getElementById('statusDot');
   const footerStatus = document.getElementById('footerStatus');
 
+  const SYMBOLS = { add: '+', subtract: '-', multiply: 'x', divide: '÷', modulo: '%', power: '^' };
+
   let current = '0';
+  let expression = '';
   let firstOperand = null;
   let operator = null;
   let waitingForSecond = false;
 
   function render() {
     display.textContent = current;
+    expressionEl.textContent = expression;
     display.classList.remove('pop');
     void display.offsetWidth;
     display.classList.add('pop');
@@ -340,6 +354,7 @@
 
   function resetAll() {
     current = '0';
+    expression = '';
     firstOperand = null;
     operator = null;
     waitingForSecond = false;
@@ -348,6 +363,7 @@
 
   function inputDigit(d) {
     if (waitingForSecond) {
+      if (operator === null) expression = ''; // starting a fresh calculation
       current = d;
       waitingForSecond = false;
     } else {
@@ -358,6 +374,7 @@
 
   function inputDecimal() {
     if (waitingForSecond) {
+      if (operator === null) expression = '';
       current = '0.';
       waitingForSecond = false;
       render();
@@ -395,11 +412,13 @@
   }
 
   async function handleSquareRoot() {
+    const value = parseFloat(current);
     try {
-      const value = parseFloat(current);
       const result = await callApi(value, 0, 'square_root');
+      expression = `√${value} =`;
       current = String(result);
     } catch (err) {
+      expression = '';
       current = 'Error';
     }
     firstOperand = null;
@@ -417,6 +436,7 @@
         current = String(result);
         firstOperand = result;
       } catch (err) {
+        expression = '';
         current = 'Error';
         firstOperand = null;
         operator = null;
@@ -429,18 +449,23 @@
     }
 
     operator = nextOp;
+    expression = `${firstOperand} ${SYMBOLS[nextOp]}`;
     waitingForSecond = true;
     render();
   }
 
   async function handleEquals() {
     if (operator === null || waitingForSecond) return;
-    const inputValue = parseFloat(current);
+    const left = firstOperand;
+    const op = operator;
+    const right = parseFloat(current);
     try {
-      const result = await callApi(firstOperand, inputValue, operator);
+      const result = await callApi(left, right, op);
+      expression = `${left} ${SYMBOLS[op]} ${right} =`;
       current = String(result);
       firstOperand = result;
     } catch (err) {
+      expression = '';
       current = 'Error';
       firstOperand = null;
     }
